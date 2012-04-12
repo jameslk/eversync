@@ -61,7 +61,6 @@ SIMULATE = false
 # --- Don't edit below ---
 
 require 'rubygems'
-require 'open3'
 require 'em-dir-watcher'
 
 class EverSync
