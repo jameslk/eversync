@@ -2,7 +2,9 @@ EverSync
 Author: James Koshigoe
 
 Description:
-This simple script continuously syncs (one-way) a local directory's contents with another directory or remote resource by using rsync. It uses the em-dir-watcher gem to be notified upon changes. For each file changed, it executes rsync on the path to sync that specific file only, instead of running rsync over the entire directory structure.
+This simple script continuously syncs (one-way) a local directory's contents with another directory or remote resource by using rsync. It uses the em-dir-watcher gem to be notified upon changes. For each file changed, it finds the directory and syncs it to the remote resource. If multiple files were modified at once, it finds the lowest directory in the tree structure and syncs that.
+
+Note: The directory monitoring handler can't detect empty directories, so an empty file needs to be added to them to pick them up.
 
 License:
 zlib/libpng License. Copyright (c) 2012 James Koshigoe.

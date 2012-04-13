@@ -3,9 +3,12 @@
 #
 # Description:
 #    This simple script continuously syncs (one-way) a local directory's contents with another directory or remote
-#    resource by using rsync. It uses the em-dir-watcher gem to be notified upon changes. For each file changed,
-#    it executes rsync on the path to sync that specific file only, instead of running rsync over the entire directory
-#    structure.
+#    resource by using rsync. It uses the em-dir-watcher gem to be notified upon changes. For each file changed, it
+#    finds the directory and syncs it to the remote resource. If multiple files were modified at once, it finds the
+#    lowest directory in the tree structure and syncs that.
+#
+#    Note: The directory monitoring handler can't detect empty directories, so an empty file needs to be added to them
+#    to pick them up.
 #
 # License:
 #    zlib/libpng License. Copyright (c) 2012 James Koshigoe.
@@ -28,12 +31,12 @@
 
 # Enter the location of rsync and any other relevant binaries for the script to use
 
-ENV['PATH'] += ";C:\\cygwin\\bin"
+ENV['PATH'] += ";C:/cygwin/bin"
 
 # This is the location of where files are being monitored for changes and transfered from. It must be a local system
 # path and not a remote resource.
 
-LOCAL_DIR = "C:\\path\\to\\my\\files"
+LOCAL_DIR = "C:/path/to/my/files"
 
 # This is the location the files are transfered to. It can be a local system path or remote resource. See rsync's
 # documentation on how to construct remote resource paths.
@@ -68,7 +71,7 @@ class EverSync
 
   def initialize(local_dir, remote_dir, rsync_options = nil)
     @rsync_command = 'rsync'
-    @local_dir = local_dir
+    @local_dir = strip_end_slash(local_dir) + '/'
     @remote_dir = remote_dir
     @rsync_options = rsync_options
     @is_simulating = false
@@ -90,18 +93,21 @@ class EverSync
     dir = File.expand_path(@local_dir)
     EM.run do
       dw = EMDirWatcher.watch dir, :grace_period => 0.5 do |paths|
+        lowest_path = nil
         paths.each do |path|
-          full_path = File.join(dir, path)
-          if File.exists?(full_path)
-            resync full_path
-          else
-            resync File.dirname(full_path), true
+          full_path = File.dirname(File.join(dir, path))
+          if !lowest_path || lowest_path =~ /^#{Regexp.quote(full_path)}/
+            lowest_path = full_path
           end
         end
+
+        resync lowest_path
       end
 
       puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
     end
+
+    puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
   end
 
   def is_remote_path?(path)
@@ -129,27 +135,24 @@ class EverSync
     strip_end_slash translate_to_rsync_path(translate_to_rsync_path(@remote_dir) + '/' + strip_start_slash(relative_path))
   end
 
-  def resync(path = nil, delete_sync = false)
+  def resync(path = nil)
     options = "#{options} #{@rsync_options}"
     if @is_simulating
       options += ' -n'
     end
 
     if path
-      local_dir = translate_to_rsync_path path
-      remote_dir = map_to_remote_path path
-
-      if delete_sync
-        local_dir = strip_end_slash(local_dir) + '/'
-        options += ' -r --delete --force'
-      end
+      path_dir = File.dirname path
+      local_dir = translate_to_rsync_path path_dir
+      remote_dir = map_to_remote_path path_dir
     else
-      options += ' -r --delete --force'
       local_dir = translate_to_rsync_path @local_dir
       remote_dir = translate_to_rsync_path @remote_dir
     end
 
-    command = "#{@rsync_command} #{options} '#{local_dir}' '#{remote_dir}'"
+    local_dir = strip_end_slash(local_dir) + '/'
+
+    command = "#{@rsync_command} -r --delete --force #{options} '#{local_dir}' '#{remote_dir}'"
 
     puts command
 
