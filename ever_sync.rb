@@ -65,6 +65,7 @@ SIMULATE = false
 
 require 'rubygems'
 require 'em-dir-watcher'
+require 'open3'
 
 class EverSync
   attr_accessor :rsync_command
@@ -72,9 +73,11 @@ class EverSync
   def initialize(local_dir, remote_dir, rsync_options = nil)
     @rsync_command = 'rsync'
     @local_dir = strip_end_slash(local_dir) + '/'
+    @local_dir_expanded = File.expand_path(@local_dir)
     @remote_dir = remote_dir
     @rsync_options = rsync_options
     @is_simulating = false
+    @sync_fails = 0
   end
 
   def enable_simulation()
@@ -90,13 +93,12 @@ class EverSync
 
     resync
 
-    dir = File.expand_path(@local_dir)
     EM.run do
-      dw = EMDirWatcher.watch dir, :grace_period => 0.5 do |paths|
+      dw = EMDirWatcher.watch @local_dir_expanded, :grace_period => 0.5 do |paths|
         lowest_path = nil
         paths.each do |path|
-          full_path = File.dirname(File.join(dir, path))
-          if !lowest_path || lowest_path =~ /^#{Regexp.quote(full_path)}/
+          full_path = File.dirname(File.join(@local_dir_expanded, path))
+          if !lowest_path || lowest_path =~ /^#{Regexp.quote(full_path)}/ #if full_path matches the beginning of lowest_path
             lowest_path = full_path
           end
         end
@@ -106,12 +108,19 @@ class EverSync
 
       puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
     end
-
-    puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
   end
 
   def is_remote_path?(path)
     path =~ /[a-zA-Z0-9-]+@.+?:\/.*/
+  end
+
+  def get_local_dir_from_path(path)
+    path_dir = File.dirname path
+    if path_dir =~ /^#{Regexp.quote(@local_dir_expanded)}/
+      path_dir
+    else
+      @local_dir_expanded
+    end
   end
 
   def strip_start_slash(path)
@@ -142,7 +151,7 @@ class EverSync
     end
 
     if path
-      path_dir = File.dirname path
+      path_dir = get_local_dir_from_path path
       local_dir = translate_to_rsync_path path_dir
       remote_dir = map_to_remote_path path_dir
     else
@@ -156,8 +165,14 @@ class EverSync
 
     puts command
 
-    IO.popen command do |output|
-      puts output.read
+    Open3.popen3 command do |input, output, error|
+      if error.read =~ /#{Regexp.quote 'No such file or directory'}/ && @sync_fails <= 1
+        @sync_fails += 1
+        resync #failed to create directory, so fall back to syncing entire root directory
+      else
+        @sync_fails = 0
+        puts output.read
+      end
     end
   end
 end
