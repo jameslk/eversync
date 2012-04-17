@@ -57,6 +57,16 @@ RSYNC_OPTIONS = "-t -v -z -e 'ssh -p 22'"
 
 RSYNC_COMMAND = "rsync"
 
+# List of exclusion filters to use. They're similar to rsync's filters, but not all features are included:
+# - Regular text will match any part of a path
+# - A filter starting with / will only match if the path has the same beginning
+# - A filter ending with / will only match if the path has the same ending
+# - ? matches any single character in a path that isn't a /
+# - * matches any number of characters in a path until it hits the first /
+# - ** matches any number of characters in a path, including /
+
+EXCLUSION_FILTERS = ['.git*']
+
 # Setting this to true will make all transfers dry runs. No files are changed.
 
 SIMULATE = false
@@ -65,27 +75,38 @@ SIMULATE = false
 
 require 'rubygems'
 require 'em-dir-watcher'
-require 'open3'
 
 class EverSync
-  attr_accessor :rsync_command
+  attr_accessor :rsync_command, :exclusion_filters
 
-  def initialize(local_dir, remote_dir, rsync_options = nil)
+  def initialize(local_dir, remote_dir, global_options = nil)
     @rsync_command = 'rsync'
     @local_dir = strip_end_slash(local_dir) + '/'
     @local_dir_expanded = File.expand_path(@local_dir)
     @remote_dir = remote_dir
-    @rsync_options = rsync_options
+    @global_options = global_options
     @is_simulating = false
-    @sync_fails = 0
+    @exclusion_filters = []
   end
 
   def enable_simulation()
     @is_simulating = true
+    self
   end
 
   def disable_simulation()
     @is_simulating = false
+    self
+  end
+
+  def add_exclusion(filter)
+    @exclusion_filters << filter
+    self
+  end
+
+  def add_exclusion_file(path)
+    @exclusion_filters << File.read(path).split(/\r?\n/)
+    self
   end
 
   def start()
@@ -95,32 +116,13 @@ class EverSync
 
     EM.run do
       dw = EMDirWatcher.watch @local_dir_expanded, :grace_period => 0.5 do |paths|
-        lowest_path = nil
-        paths.each do |path|
-          full_path = File.dirname(File.join(@local_dir_expanded, path))
-          if !lowest_path || lowest_path =~ /^#{Regexp.quote(full_path)}/ #if full_path matches the beginning of lowest_path
-            lowest_path = full_path
-          end
-        end
-
-        resync lowest_path
+        resync paths
       end
 
       puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
     end
-  end
 
-  def is_remote_path?(path)
-    path =~ /[a-zA-Z0-9-]+@.+?:\/.*/
-  end
-
-  def get_local_dir_from_path(path)
-    path_dir = File.dirname path
-    if path_dir =~ /^#{Regexp.quote(@local_dir_expanded)}/
-      path_dir
-    else
-      @local_dir_expanded
-    end
+    self
   end
 
   def strip_start_slash(path)
@@ -131,6 +133,10 @@ class EverSync
     path.sub /\/$/, ''
   end
 
+  def is_remote_path?(path)
+    path =~ /[a-zA-Z0-9-]+@.+?:\/.*/
+  end
+
   def translate_to_rsync_path(path)
     if is_remote_path?(path)
       path.gsub /\s/, '\\ ' #white spaces need to escaped with backslashes for the remote shell only
@@ -139,40 +145,86 @@ class EverSync
     end
   end
 
-  def map_to_remote_path(local_path)
-    relative_path = translate_to_rsync_path(local_path).gsub /^#{Regexp.quote strip_end_slash(translate_to_rsync_path(@local_dir))}/, ''
-    strip_end_slash translate_to_rsync_path(translate_to_rsync_path(@remote_dir) + '/' + strip_start_slash(relative_path))
+  def path_in_filter?(path, filter)
+    regexp = ''
+
+    i = 0
+    stars = 0
+    filter.each_byte do |ascii|
+      char = ascii.chr
+
+      if char == '*'
+        stars += 1
+      else
+        if stars >= 2
+          regexp += '.*?'
+        elsif stars >= 1
+          regexp += '[^\/]*?'
+        end
+
+        if char == '/' && i == 0
+          regexp = '^\/?'
+        elsif char == '/' && (i + 1) == filter.length
+          regexp += '\/?$'
+        elsif char == '?'
+          regexp += '[^\/]?'
+        else
+          regexp += Regexp.escape char
+        end
+
+        stars = 0
+      end
+
+      i += 1
+    end
+
+    Regexp.new(regexp) =~ path
   end
 
-  def resync(path = nil)
-    options = "#{options} #{@rsync_options}"
+  def remove_excluded_paths(paths)
+    paths.delete_if do |path|
+      @exclusion_filters.reduce(false) do |status, filter|
+        status || path_in_filter?(path, filter)
+      end
+    end
+  end
+
+  def resync(files = nil)
+    options = ''
     if @is_simulating
       options += ' -n'
     end
 
-    if path
-      path_dir = get_local_dir_from_path path
-      local_dir = translate_to_rsync_path path_dir
-      remote_dir = map_to_remote_path path_dir
+    files_input = ''
+    if files && (files = remove_excluded_paths(files))
+      options += ' --include-from=- --exclude=*'
+
+      filters = []
+      files.each do |file|
+        file = '/' + strip_end_slash(file)
+        begin
+          filters << file
+        end while (file = File.dirname(file)) != '/'
+      end
+
+      files_input = filters.join("\n")
     else
-      local_dir = translate_to_rsync_path @local_dir
-      remote_dir = translate_to_rsync_path @remote_dir
+      options += ' --exclude-from=-'
+      files_input = @exclusion_filters.join("\n")
     end
 
-    local_dir = strip_end_slash(local_dir) + '/'
+    local_dir = strip_end_slash(translate_to_rsync_path(@local_dir)) + '/'
+    remote_dir = translate_to_rsync_path(@remote_dir)
 
-    command = "#{@rsync_command} -r --delete --force #{options} '#{local_dir}' '#{remote_dir}'"
+    command = "#{@rsync_command} -r --delete --ignore-errors --force #{options} #{@global_options} '#{local_dir}' '#{remote_dir}'"
 
     puts command
+    puts "\n#{files_input}"
 
-    Open3.popen3 command do |input, output, error|
-      if error.read =~ /#{Regexp.quote 'No such file or directory'}/ && @sync_fails <= 1
-        @sync_fails += 1
-        resync #failed to create directory, so fall back to syncing entire root directory
-      else
-        @sync_fails = 0
-        puts output.read
-      end
+    IO.popen command, mode='r+' do |io|
+      io.write files_input
+      io.close_write
+      puts io.read
     end
   end
 end
@@ -180,6 +232,7 @@ end
 # --- Execution ---
 
 ever_sync = EverSync.new LOCAL_DIR, REMOTE_DIR, RSYNC_OPTIONS
+ever_sync.exclusion_filters = EXCLUSION_FILTERS
 
 ever_sync.rsync_command = RSYNC_COMMAND
 
