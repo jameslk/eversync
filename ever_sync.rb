@@ -140,8 +140,10 @@ class EverSync
   def translate_to_rsync_path(path)
     if is_remote_path?(path)
       path.gsub /\s/, '\\ ' #white spaces need to escaped with backslashes for the remote shell only
-    elsif ENV['OS'].downcase =~ /windows/
+    elsif ENV.has_key?('OS') && ENV['OS'].downcase =~ /windows/
       IO.popen("cygpath #{path}").read.strip.gsub /\s/, ' '
+    else
+      path.strip.gsub /\s/, ' '
     end
   end
 
