@@ -1,5 +1,5 @@
 # EverSync: Cross-platform continuously syncing via rsync
-#### James Koshigoe
+#### zlib/libpng License. Copyright (c) 2012 James Koshigoe.
 
 
 # Description
