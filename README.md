@@ -13,4 +13,4 @@ to pick them up.
 
 # Installation
 Install the em-dir-watcher gem and its dependencies (https://github.com/mockko/em-dir-watcher) and edit the
-settings below.
+settings at the top of the script file.
