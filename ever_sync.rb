@@ -2,36 +2,22 @@
 # Author: James Koshigoe
 #
 # Description:
-#    This simple script continuously syncs (one-way) a local directory's contents with another directory or remote
-#    resource by using rsync. It uses the em-dir-watcher gem to be notified upon changes. For each file changed, it
-#    finds the directory and syncs it to the remote resource. If multiple files were modified at once, it finds the
-#    lowest directory in the tree structure and syncs that.
+#    A simple cross-platform script to continuously monitor and and synchronize (one-way) a local directory's contents
+#    with a remote resource using rsync. It uses the em-dir-watcher gem to be notified upon file changes. A practical
+#    application for this (i.e. the reason I built it) might be for working on code locally and testing it on a remote
+#    server (e.g. through a browser) everytime you make a change.
 #
 #    Note: The directory monitoring handler can't detect empty directories, so an empty file needs to be added to them
 #    to pick them up.
 #
-# License:
-#    zlib/libpng License. Copyright (c) 2012 James Koshigoe.
-#
-#    This software is provided 'as-is', without any express or implied
-#    warranty.  In no event will the authors be held liable for any damages
-#    arising from the use of this software.
-#
-#    Permission is granted to anyone to use this software for any purpose,
-#    including commercial applications, and to alter it and redistribute it
-#    freely, subject to the following restrictions:
-#
-#    1. The origin of this software must not be misrepresented; you must not
-#    claim that you wrote the original software. If you use this software
-#    in a product, an acknowledgment in the product documentation would be
-#    appreciated but is not required.
-#    2. Altered source versions must be plainly marked as such, and must not be
-#    misrepresented as being the original software.
-#    3. This notice may not be removed or altered from any source distribution.
+# Installation:
+#    Install the em-dir-watcher gem and its dependencies (https://github.com/mockko/em-dir-watcher) and edit the
+#    settings below.
+
 
 # Enter the location of rsync and any other relevant binaries for the script to use
 
-ENV['PATH'] += ";C:/cygwin/bin"
+# ENV['PATH'] += ";C:/cygwin/bin"
 
 # This is the location of where files are being monitored for changes and transfered from. It must be a local system
 # path and not a remote resource.
