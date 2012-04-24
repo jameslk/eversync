@@ -1,5 +1,6 @@
 # EverSync: Cross-platform continuously syncing via rsync
-### James Koshigoe
+#### James Koshigoe
+
 
 # Description
 A simple cross-platform script to continuously monitor and and synchronize (one-way) a local directory's contents
