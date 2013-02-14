@@ -60,7 +60,7 @@ SIMULATE = false
 # --- Don't edit below ---
 
 require 'rubygems'
-require 'em-dir-watcher'
+require 'listen'
 
 class EverSync
   attr_accessor :rsync_command, :exclusion_filters
@@ -100,15 +100,17 @@ class EverSync
 
     resync
 
-    EM.run do
-      dw = EMDirWatcher.watch @local_dir_expanded, :grace_period => 0.5 do |paths|
-        resync paths
-      end
-
-      puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
+    Listen.to(@local_dir_expanded, latency: 0.5) do |modified, added, removed|
+      resync modified | added | removed
     end
 
+    puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
+
     self
+  end
+
+  def convert_to_relative_path(path)
+    path.sub(/^#{@local_dir_expanded}/, '')
   end
 
   def strip_start_slash(path)
@@ -189,7 +191,7 @@ class EverSync
 
       filters = []
       files.each do |file|
-        file = '/' + strip_end_slash(file)
+        file = strip_end_slash(convert_to_relative_path(file))
         begin
           filters << file
         end while (file = File.dirname(file)) != '/'
