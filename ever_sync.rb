@@ -3,7 +3,7 @@
 #
 # Description:
 #    A simple cross-platform script to continuously monitor and and synchronize (one-way) a local directory's contents
-#    with a remote resource using rsync. It uses the em-dir-watcher gem to be notified upon file changes. A practical
+#    with a remote resource using rsync. It uses the listen gem to be notified upon file changes. A practical
 #    application for this (i.e. the reason I built it) might be for working on code locally and testing it on a remote
 #    server (e.g. through a browser) everytime you make a change.
 #
@@ -11,7 +11,7 @@
 #    to pick them up.
 #
 # Installation:
-#    Install the em-dir-watcher gem and its dependencies (https://github.com/mockko/em-dir-watcher) and edit the
+#    Install the listen gem and its dependencies (https://github.com/guard/listen) and edit the
 #    settings below.
 
 
@@ -32,7 +32,7 @@ REMOTE_DIR = "username@localhost:/remote/path"
 # These are the options that should be passed to rsync for every transfer. For example, the SSH port can be specified
 # here.
 
-RSYNC_OPTIONS = "-t -v -z -e 'ssh -p 22'"
+RSYNC_OPTIONS = "-t -v -z -l -e 'ssh -p 22'"
 
 # This is the command to run rsync.
 #
@@ -100,7 +100,7 @@ class EverSync
 
     resync
 
-    Listen.to(@local_dir_expanded, latency: 0.5) do |modified, added, removed|
+    Listen.to!(@local_dir_expanded, latency: 0.5) do |modified, added, removed|
       resync modified | added | removed
     end
 
@@ -191,10 +191,11 @@ class EverSync
 
       filters = []
       files.each do |file|
-        file = strip_end_slash(convert_to_relative_path(file))
-        begin
-          filters << file
-        end while (file = File.dirname(file)) != '/'
+        path = strip_end_slash(convert_to_relative_path(file))
+        while (root_path = File.dirname(path)) != path
+          filters << path
+          path = root_path
+        end
       end
 
       files_input = filters.join("\n")
