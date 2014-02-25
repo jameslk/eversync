@@ -100,13 +100,19 @@ class EverSync
 
     resync
 
-    Listen.to!(@local_dir_expanded, latency: 0.5) do |modified, added, removed|
+    listener = Listen.to(@local_dir_expanded, latency: 0.5) do |modified, added, removed|
       resync modified | added | removed
     end
 
+    listener.start
+
     puts "EverSync is synchronizing '#{@local_dir}' to '#{@remote_dir}'"
 
-    self
+    trap('INT') do
+      exit
+    end
+
+    loop { sleep(1) } # block
   end
 
   def convert_to_relative_path(path)
