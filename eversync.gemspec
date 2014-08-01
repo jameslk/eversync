@@ -8,13 +8,13 @@ Gem::Specification.new do |spec|
   spec.version       = Eversync::VERSION
   spec.authors       = ["James Koshigoe"]
   spec.email         = ["james@jameskoshigoe.com"]
-  spec.summary       = %q{TODO: Write a short summary. Required.}
-  spec.description   = %q{TODO: Write a longer description. Optional.}
-  spec.homepage      = ""
+  spec.summary       = %q{Continuous syncing with rsync}
+  spec.description   = %q{A simple tool to continuously monitor and and synchronize (one-way) a local directory's contents with a remote resource using rsync.}
+  spec.homepage      = "https://github.com/jameslk/eversync"
   spec.license       = "MIT"
 
   spec.files         = `git ls-files -z`.split("\x0")
-  spec.executables   = spec.files.grep(%r{^bin/}) { |f| File.basename(f) }
+  gem.executables   = ["eversync"]
   spec.test_files    = spec.files.grep(%r{^(test|spec|features)/})
   spec.require_paths = ["lib"]
 

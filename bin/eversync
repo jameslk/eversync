@@ -1,0 +1,6 @@
+#!/usr/bin/env ruby
+
+require 'eversync'
+
+eversync = Eversync.new
+eversync.boop

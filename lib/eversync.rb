@@ -1,5 +1,7 @@
 require "eversync/version"
 
 module Eversync
-  # Your code goes here...
+  def boop
+    puts 'Boop!'
+  end
 end

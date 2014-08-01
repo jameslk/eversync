@@ -1,7 +1,7 @@
-# EverSync: Cross-platform continuously syncing via rsync
+# Eversync: Continuous syncing with rsync
 
 # Description
-A simple cross-platform script to continuously monitor and and synchronize (one-way) a local directory's contents with
+A simple tool to continuously monitor and and synchronize (one-way) a local directory's contents with
 a remote resource using rsync. It depends on a gem called [listen](https://github.com/guard/listen) to be notified upon
 file changes. A practical application for this (i.e. the reason I built it) might be for working on code locally and
 testing it on a remote server (e.g. through a browser) everytime you make a change.
